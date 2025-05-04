@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  user-service:
+      build: .
+      container_name: user-service
+      environment:
+        - DATABASE_URL=postgresql://admin:123123@postgres:5432/userdb
+        - RABBITMQ_URL=amqp://myuser:123123@rabbitmq:5672
+      volumes:
+        - ./:/app
+      working_dir: /app
+      command: sh -c "npm install && npm run start:dev"
+      ports:
+        - "3001:3001"
+      networks:
+        - postgres-net
+        - rabbitmq-net
+        - nginx-gateway
+  user-worker:
+    build: .
+    container_name: user-worker
+    command: npm run start:worker
+    environment:
+      - NODE_ENV=production
+      - RABBITMQ_URL=amqp://myuser:123123@rabbitmq:5672
+    networks:
+      - rabbitmq-net
+      - postgres-net
+      
+networks:
+  postgres-net:
+    external: true
+  rabbitmq-net:
+    external: true
+  nginx-gateway:
+    external: true
+
