@@ -12,6 +12,6 @@
     "baseUrl": "./src",
     "incremental": true
   },
-  "include": ["src/**/*", "common/exceptions"],
+  "include": ["src/**/*", "common/exceptions", "common/types"],
   "exclude": ["node_modules", "dist"]
 } 
