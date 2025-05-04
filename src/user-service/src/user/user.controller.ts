@@ -1,13 +1,11 @@
 import {
   Controller,
-  Get,
   Param,
   Post,
   Body,
   Delete,
   Patch,
   UseGuards,
-  Req,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UpdateProfileDto } from './dto';
@@ -33,7 +31,6 @@ export class UserController {
   async updateProfile(
     @Param('id') id: string,
     @Body() data: UpdateProfileDto,
-    @Req() req,
   ) {
     return this.userService.updateProfile(id, data);
   }
