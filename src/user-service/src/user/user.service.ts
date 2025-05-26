@@ -2,13 +2,14 @@ import {
   Injectable,
   Inject,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma';
-import { UserStatus } from '../../common/types/user-status';
 import { RpcException } from '@nestjs/microservices';
 import * as bcrypt from 'bcryptjs';
 import { UpdateProfileDto } from './dto';
 import { ClientProxy } from '@nestjs/microservices';
+import { UserStatus } from '../../common/types/user-status';
 
 @Injectable()
 export class UserService {
@@ -16,6 +17,10 @@ export class UserService {
     private readonly prisma: PrismaService,
     @Inject('AUTH_SERVICE') private readonly authClient: ClientProxy,
   ) {}
+
+  async findById(id: string) {
+    return this.prisma.user.findUnique({ where: { id } });
+  }
 
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({ where: { email } });
@@ -40,16 +45,6 @@ export class UserService {
 
     if (data.dateOfBirth) data.dateOfBirth = new Date(data.dateOfBirth);
 
-    const VALID_STATUSES: UserStatus[] = ['active', 'blocked', 'unverified'];
-
-    if (data.status) {
-      if (!VALID_STATUSES.includes(data.status)) {
-        throw new BadRequestException('Invalid status value');
-      }
-    } else {
-      data.status = 'unverified';
-    }
-
     return this.prisma.user.create({ data });
   }
 
@@ -66,9 +61,14 @@ export class UserService {
 
   async updateProfile(id: string, data: UpdateProfileDto) {
     const updateData: any = {};
-    console.log('updateProfile payload:', data);
     if (data.email) updateData.email = data.email;
-    if (data.phone) updateData.phone = data.phone;
+    if (data.phone) {
+      const existingUser = await this.prisma.user.findUnique({ where: { phone: data.phone } });
+      if (existingUser && existingUser.id !== id) {
+        throw new ConflictException('User with this phone already exists');
+      }
+      updateData.phone = data.phone;
+    }
     if (data.password)
       updateData.passwordHash = await bcrypt.hash(data.password, 10);
 
@@ -89,6 +89,13 @@ export class UserService {
     return this.prisma.user.update({
       where: { id: userId },
       data: { twoFactorEnabled: false },
+    });
+  }
+
+  async updateUserStatus(userId: string, status: UserStatus): Promise<any> {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { status },
     });
   }
 }

@@ -1,9 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import * as cookieParser from 'cookie-parser';
-import { AllRpcExceptionsFilter } from '../common/exceptions';
 import { ConfigService } from '@nestjs/config';
+import * as cookieParser from 'cookie-parser';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { AllRpcExceptionsFilter } from '../common/exceptions';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -28,10 +28,10 @@ async function bootstrap() {
 
   await app.startAllMicroservices();
 
-  const port = configService.get<number>('PORT') ?? 3001;
+  const port = configService.get<number>('PORT') ?? 3002;
 
   await app.listen(port);
-  console.log(`User Service is running on http://localhost:${port}`);
+  console.log(`Verification Service is running on http://localhost:${port}`);
 }
 
 bootstrap();

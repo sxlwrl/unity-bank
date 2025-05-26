@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module';
+import { Transport, MicroserviceOptions } from '@nestjs/microservices';
 import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
@@ -13,11 +13,14 @@ async function bootstrap() {
       options: {
         urls: [configService.get<string>('RABBITMQ_URL')],
         queue: configService.get<string>('RABBITMQ_QUEUE'),
-        queueOptions: { durable: true },
+        queueOptions: {
+          durable: true,
+        },
       },
     });
 
   await microservice.listen();
-  console.log('Auth Worker is listening for RabbitMQ messages...');
+  console.log('Verification worker is listening for RabbitMQ messages...');
 }
+
 bootstrap();
