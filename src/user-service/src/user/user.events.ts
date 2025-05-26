@@ -4,6 +4,7 @@ import {
   Payload,
 } from '@nestjs/microservices';
 import { UserService } from './user.service';
+import { UserStatus } from '../../common/types/user-status';
 
 @Controller()
 export class UserEventsController {
@@ -15,7 +16,10 @@ export class UserEventsController {
   }
 
   @MessagePattern({ cmd: 'find-user' })
-  async findUser(@Payload() data: { email?: string; phone?: string }) {
+  async findUser(@Payload() data: { id?: string, email?: string; phone?: string }) {
+    if (data.id) {
+      return this.userService.findById(data.id);
+    }
     if (data.email) {
       return this.userService.findByEmail(data.email);
     }
@@ -40,5 +44,10 @@ export class UserEventsController {
   @MessagePattern({ cmd: 'disable-2fa' })
   async disable2FA(@Payload() data: { userId: string }) {
     return this.userService.disable2FA(data.userId);
+  }
+
+  @MessagePattern({ cmd: 'change-user-status' })
+  async updateUserStatus(@Payload() data: { userId: string; status: string }) {
+    return this.userService.updateUserStatus(data.userId, data.status as UserStatus);
   }
 }

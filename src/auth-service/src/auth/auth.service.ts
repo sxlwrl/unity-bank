@@ -11,6 +11,7 @@ import { RedisService } from '../redis';
 import { PrismaService } from '../prisma';
 import { randomUUID } from 'crypto';
 import { ClientProxy } from '@nestjs/microservices';
+import { firstValueFrom, timeout } from 'rxjs';
 import * as bcrypt from 'bcryptjs';
 import * as speakeasy from 'speakeasy';
 
@@ -24,33 +25,38 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const user = await this.userClient
-      .send(
-        { cmd: 'create-user' },
-        {
-          email: dto.email,
-          phone: dto.phone,
-          fullName: dto.fullName,
-          passwordHash,
-          dateOfBirth: dto.dateOfBirth,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          status: 'unverified',
-        },
-      )
-      .toPromise();
+    const user = await firstValueFrom(
+      this.userClient
+        .send(
+          { cmd: 'create-user' },
+          {
+            email: dto.email,
+            phone: dto.phone,
+            fullName: dto.fullName,
+            passwordHash,
+            dateOfBirth: dto.dateOfBirth,
+            role: 'user',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            status: 'unverified',
+          },
+        )
+        .pipe(timeout(3000)),
+    );
     return { id: user.id, email: user.email, phone: user.phone };
   }
 
   async login(dto: LoginDto) {
-    const user = await this.userClient
-      .send(
-        { cmd: 'find-user' },
-        {
-          phone: dto.phone,
-        },
-      )
-      .toPromise();
+    const user = await firstValueFrom(
+      this.userClient
+        .send(
+          { cmd: 'find-user' },
+          {
+            phone: dto.phone,
+          },
+        )
+        .pipe(timeout(3000)),
+    );
 
     if (!user) throw new UnauthorizedException('User not found');
 
@@ -66,7 +72,10 @@ export class AuthService {
     }
 
     const sessionId = randomUUID();
-    await this.redisService.setSession(sessionId, { userId: user.id });
+    await this.redisService.setSession(sessionId, {
+      userId: user.id,
+      role: user.role,
+    });
     return { sessionId };
   }
 
@@ -96,7 +105,9 @@ export class AuthService {
       where: { id: tfa.id },
       data: { enabled: true },
     });
-    await this.userClient.send({ cmd: 'enable-2fa' }, { userId }).toPromise();
+    await firstValueFrom(
+      this.userClient.send({ cmd: 'enable-2fa' }, { userId }),
+    );
     return { success: true };
   }
 
@@ -104,6 +115,7 @@ export class AuthService {
     const tfa = await this.prisma.twoFactorSecret.findFirst({
       where: { userId, enabled: true },
     });
+
     if (!tfa) throw new NotFoundException('2FA not enabled');
     const verified = speakeasy.totp.verify({
       secret: tfa.secret,
@@ -113,8 +125,15 @@ export class AuthService {
 
     if (!verified) throw new ForbiddenException('Invalid 2FA code');
 
+    const user = await firstValueFrom(
+      this.userClient
+        .send({ cmd: 'find-user' }, { id: userId })
+        .pipe(timeout(3000)),
+    );
+    if (!user) throw new UnauthorizedException('User not found');
+
     const sessionId = randomUUID();
-    await this.redisService.setSession(sessionId, { userId });
+    await this.redisService.setSession(sessionId, { userId, role: user.role });
     return { sessionId };
   }
 
@@ -124,15 +143,17 @@ export class AuthService {
     });
     if (!tfa) throw new NotFoundException('2FA not enabled');
     await this.prisma.twoFactorSecret.deleteMany({ where: { userId } });
-    await this.userClient.send({ cmd: 'disable-2fa' }, { userId }).toPromise();
+    await firstValueFrom(
+      this.userClient.send({ cmd: 'disable-2fa' }, { userId }),
+    );
     return { success: true };
   }
 
   // --- Password Reset ---
   async requestPasswordReset(email: string) {
-    const user = await this.userClient
-      .send({ cmd: 'find-user' }, { email })
-      .toPromise();
+    const user = await firstValueFrom(
+      this.userClient.send({ cmd: 'find-user' }, { email }),
+    );
     if (!user) throw new NotFoundException('User not found');
     const token = randomUUID();
     const expiresAt = new Date(Date.now() + 1000 * 60 * 15); // 15 minutes
@@ -154,12 +175,12 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired token');
     }
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await this.userClient
-      .send(
+    await firstValueFrom(
+      this.userClient.send(
         { cmd: 'update-user-password' },
         { userId: prt.userId, passwordHash },
-      )
-      .toPromise();
+      ),
+    );
     await this.prisma.passwordResetToken.delete({ where: { token } });
     return { success: true };
   }
