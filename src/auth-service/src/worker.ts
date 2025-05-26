@@ -2,7 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
-import { AmqpTransport, ExchangeType } from '@nestjstools/microservices-rabbitmq';
 
 async function bootstrap() {
   const appContext = await NestFactory.create(AppModule);
