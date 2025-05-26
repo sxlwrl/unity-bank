@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
-import { ClientProxy, RpcException } from '@nestjs/microservices';
+import { ClientProxy  } from '@nestjs/microservices';
 import { Request } from 'express';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class SessionGuard implements CanActivate {
@@ -13,8 +14,7 @@ export class SessionGuard implements CanActivate {
     const sessionId = req.cookies?.sessionId || req.headers['x-session-id'];
     if (!sessionId) throw new UnauthorizedException('No session');
     try {
-      const session: any = await this.authClient.send({ cmd: 'validate-session' }, sessionId).toPromise();
-      console.log('session', session);
+      const session: any = await firstValueFrom(this.authClient.send({ cmd: 'validate-session' }, sessionId));
       if (!session?.valid) throw new UnauthorizedException('Invalid session');
       req['user'] = session;
       return true;
